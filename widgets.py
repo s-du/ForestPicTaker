@@ -1,9 +1,11 @@
+import matplotlib.pyplot as plt
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from PySide6.QtUiTools import QUiLoader
 
 import os
+import numpy as np
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
@@ -117,10 +119,36 @@ def loadUi(uifile, baseinstance=None, customWidgets=None,
     QMetaObject.connectSlotsByName(widget)
     return widget
 
+def QPixmapFromItem(item):
+    pixmap = QPixmap(item.boundingRect().size().toSize())
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    # this line seems to be needed for all items except of a LineItem...
+    painter.translate(-item.boundingRect().x(), -item.boundingRect().y())
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    opt = QStyleOptionGraphicsItem()
+    item.paint(painter, opt)  # here in some cases the self is needed
+    return pixmap
+
+def QPixmapToArray(pixmap):
+    ## Get the size of the current pixmap
+    size = pixmap.size()
+    h = size.width()
+    w = size.height()
+
+    ## Get the QImage Item and convert it to a byte string
+    qimg = pixmap.toImage()
+    byte_str = qimg.bits().tobytes()
+
+    ## Using the np.frombuffer function to convert the byte string into an np array
+    img = np.frombuffer(byte_str, dtype=np.uint8).reshape((w,h,4))
+
+    return img
 
 class PhotoViewer(QGraphicsView):
     photoClicked = Signal(QPoint)
-    endDrawing = Signal(int)
+    endDrawing_brush = Signal(int)
+    endDrawing_rect = Signal(int)
 
     def __init__(self, parent):
         super(PhotoViewer, self).__init__(parent)
@@ -138,10 +166,13 @@ class PhotoViewer(QGraphicsView):
         self.setFrameShape(QFrame.NoFrame)
 
         self.rect = False
+        self.painting = False
         self.setMouseTracking(True)
         self.origin = QPoint()
 
         self._current_rect_item = None
+        self._current_path_item = None
+        self._current_path = None
 
         self.pen = QPen()
         # self.pen.setStyle(Qt.DashDotLine)
@@ -152,6 +183,8 @@ class PhotoViewer(QGraphicsView):
 
         self.categories = None
         self.active_category = None
+
+
 
     def hasPhoto(self):
         return not self._empty
@@ -208,7 +241,7 @@ class PhotoViewer(QGraphicsView):
                     self._zoom = 0
 
     def toggleDragMode(self):
-        if not self.rect:
+        if not self.rect or self.painting:
             if self.dragMode() == QGraphicsView.ScrollHandDrag:
                 self.setDragMode(QGraphicsView.NoDrag)
             elif not self._photo.pixmap().isNull():
@@ -233,7 +266,7 @@ class PhotoViewer(QGraphicsView):
 
     def redraw_all_items(self):
         for cat in self.categories:
-            for item in cat.item_list:
+            for item in cat.item_list_rect:
                 self._scene.addItem(item)
 
     def mousePressEvent(self, event):
@@ -241,11 +274,24 @@ class PhotoViewer(QGraphicsView):
             self._current_rect_item = QGraphicsRectItem()
             self._current_rect_item.setFlag(QGraphicsItem.ItemIsSelectable)
             self._current_rect_item.setPen(self.pen)
-            self.active_category.item_list.append(self._current_rect_item)
+            self.active_category.item_list_rect.append(self._current_rect_item)
             self._scene.addItem(self._current_rect_item)
             self.origin = self.mapToScene(event.pos())
             r = QRectF(self.origin, self.origin)
             self._current_rect_item.setRect(r)
+        elif self.painting:
+            print(self.painting)
+            self.origin = self.mapToScene(event.pos())
+            print(self.origin)
+
+            self._current_path = QPainterPath(self.origin)
+
+            self._current_path_item = QGraphicsPathItem()
+            self._current_path_item.setPath(self._current_path)
+            self._current_path_item.setPen(self.pen)
+
+            self.active_category.item_list_brush.append(self._current_path_item)
+            self._scene.addItem(self._current_path_item)
 
         else:
             if self._photo.isUnderMouse():
@@ -258,21 +304,53 @@ class PhotoViewer(QGraphicsView):
                 new_coord = self.mapToScene(event.pos())
                 r = QRectF(self.origin, new_coord)
                 self._current_rect_item.setRect(r)
+        elif self.painting:
+            if self._current_path_item is not None:
+                new_coord = self.mapToScene(event.pos())
+                self._current_path.lineTo(new_coord)
+                self._current_path_item.setPath(self._current_path)
+
         super(PhotoViewer, self).mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-
         if self.rect:
             self.rect = False
             self.origin = QPoint()
             if self._current_rect_item is not None:
                 coord = self.getCoord(self._current_rect_item)
                 print(self.active_category)
-                self.active_category.roi_list.append(coord)
-                self.active_category.nb_roi += 1
-                self.endDrawing.emit(self.active_category.nb_roi)
+                self.active_category.roi_list_rect.append(coord)
+                self.active_category.nb_roi_rect += 1
+                self.endDrawing_rect.emit(self.active_category.nb_roi_rect)
                 print('rectangle ROI added: ' + str(coord))
             self._current_rect_item = None
+            self.toggleDragMode()
+
+        elif self.painting:
+
+            if self._current_path_item is not None:
+                # create pixmap from item
+                pixmap = QPixmapFromItem(self._current_path_item)
+                image = QPixmapToArray(pixmap)
+                print(image)
+
+                gray = np.dot(image[...,:3], [0.2989, 0.5870, 0.1140])
+                print(gray)
+                coords = np.column_stack(np.where(gray > 2))
+                limit_row = int(self.origin.x())
+                limit_col = int(self.origin.y())
+
+                coords[:, 0] += limit_col
+                coords[:, 1] += limit_row
+
+                self.active_category.roi_list_brush.append(coords)
+                self.active_category.nb_roi_brush += 1
+                self.endDrawing_brush.emit(self.active_category.nb_roi_brush)
+                print('brush ROI added')
+
+            self.painting = False
+            self.origin = QPoint()
+            self._current_path_item = None
             self.toggleDragMode()
 
 

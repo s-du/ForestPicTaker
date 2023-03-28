@@ -6,17 +6,18 @@ import widgets as wid
 import weka as wk
 import resources as res
 
-import numpy as np
-
 from skimage import data, segmentation, feature, future
 import matplotlib.pyplot as plt
 
 
 class PixelCategory:
     def __init__(self):
-        self.nb_roi = 0
-        self.item_list = []
-        self.roi_list = []
+        self.nb_roi_rect = 0
+        self.nb_roi_brush = 0
+        self.item_list_rect = []
+        self.item_list_brush = []
+        self.roi_list_rect = []
+        self.roi_list_brush = []
         self.color = None
         self.name = ''
 
@@ -60,7 +61,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.add_icon(res.find('img/label.png'), self.pushButton_addCat)
 
         self.add_icon(res.find('img/load.png'), self.actionLoad_image)
-        self.add_icon(res.find('img/rectangle.png'), self.actionRectangle_selection)
+        self.add_icon(res.find('img/rectangle3.png'), self.actionRectangle_selection)
         self.add_icon(res.find('img/hand.png'), self.actionHand_selector)
         self.add_icon(res.find('img/brush.png'), self.actionBrush)
         self.add_icon(res.find('img/test.png'), self.actionTest)
@@ -91,10 +92,12 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.pushButton_addCat.clicked.connect(self.add_cat)
         self.actionLoad_image.triggered.connect(self.get_image)
         self.actionRectangle_selection.triggered.connect(self.rectangle_selection)
+        self.actionBrush.triggered.connect(self.brush_selection)
         self.actionRun.triggered.connect(self.go_segment)
         self.actionTest.triggered.connect(self.generate_multi_outputs)
 
-        self.viewer.endDrawing.connect(self.add_roi)
+        self.viewer.endDrawing_rect.connect(self.add_roi_rect)
+        self.viewer.endDrawing_brush.connect(self.add_roi_brush)
         self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
 
     def on_cat_change(self):
@@ -155,6 +158,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
             self.comboBox_cat.setEnabled(True)
             if self.image_loaded:
                 self.actionRectangle_selection.setEnabled(True)
+                self.actionBrush.setEnabled(True)
 
             # add header to ROI list
             self.add_item_in_tree(self.model, text)
@@ -177,21 +181,17 @@ class WEKAWindow(QtWidgets.QMainWindow):
 
             self.on_cat_change()
 
-    def add_roi(self, nb):
-        # add roi item
-        # find name in model
-        rect_item = self.model.findItems(self.active_category.name)
-
+    def add_roi_brush(self, nb):
+        brush_item = self.model.findItems(self.active_category.name)
         cat_from_gui = self.viewer.getCurrentCat()
-        self.active_category.nb_roi = cat_from_gui.nb_roi
-        self.active_category.roi_list = cat_from_gui.roi_list
-        nb_roi = self.active_category.nb_roi
-        desc = 'rect_zone' + str(nb_roi)
 
-        self.add_item_in_tree(rect_item[0], desc)
+        self.active_category.nb_roi_brush = cat_from_gui.nb_roi_brush
+        self.active_category.roi_list_brush = cat_from_gui.roi_list_brush
+        nb_roi = self.active_category.nb_roi_brush
+        desc = 'brush_zone' + str(nb_roi)
+
+        self.add_item_in_tree(brush_item[0], desc)
         self.categories[self.active_i] = self.active_category
-
-        print(self.active_category.roi_list)
 
         # switch back to hand tool
         self.actionHand_selector.setChecked(True)
@@ -199,6 +199,37 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.actionRun.setEnabled(True)
         self.actionTest.setEnabled(True)
 
+    def add_roi_rect(self, nb):
+        # add roi item
+        # find name in model
+        rect_item = self.model.findItems(self.active_category.name)
+
+        cat_from_gui = self.viewer.getCurrentCat()
+        self.active_category.nb_roi_rect = cat_from_gui.nb_roi_rect
+        self.active_category.roi_list_rect = cat_from_gui.roi_list_rect
+        nb_roi = self.active_category.nb_roi_rect
+        desc = 'rect_zone' + str(nb_roi)
+
+        self.add_item_in_tree(rect_item[0], desc)
+        self.categories[self.active_i] = self.active_category
+
+        # switch back to hand tool
+        self.actionHand_selector.setChecked(True)
+
+        self.actionRun.setEnabled(True)
+        self.actionTest.setEnabled(True)
+
+    def brush_selection(self):
+        if self.actionBrush.isChecked():
+            self.viewer.setCat(self.active_category, self.categories)
+
+            # define color of rectangle selection
+            color = self.active_category.color
+
+            # activate drawing tool
+            self.viewer.pen.setColor(color)
+            self.viewer.painting = True
+            self.viewer.toggleDragMode()
 
     def rectangle_selection(self):
         if self.actionRectangle_selection.isChecked():

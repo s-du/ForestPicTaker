@@ -8,13 +8,19 @@ def generate_training(img_array, categories):
     training_labels = np.zeros(img_array.shape[:2], dtype=np.uint8)
 
     for i, cat in enumerate(categories):
-        for roi in cat.roi_list:
+        for roi in cat.roi_list_rect:
             start_x = int(roi[0].x())
             start_y = int(roi[0].y())
             end_x = int(roi[1].x())
             end_y = int(roi[1].y())
 
             training_labels[start_y:end_y, start_x:end_x] = i + 1
+        for roi in cat.roi_list_brush:
+            for j in range(len(roi[:, 1])):
+                # take line by line, each line is a coordinate couple
+                coord = roi[j, :]
+                training_labels[coord[0], coord[1]] = i + 1
+
 
     return training_labels
 
