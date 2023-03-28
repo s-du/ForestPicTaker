@@ -48,13 +48,23 @@ class WEKAWindow(QtWidgets.QMainWindow):
 
         self.training_labels = None
 
+        # add actions to action group
+        ag = QtGui.QActionGroup(self)
+        ag.setExclusive(True)
+        ag.addAction(self.actionRectangle_selection)
+        ag.addAction(self.actionHand_selector)
+        ag.addAction(self.actionBrush)
+
+
         # Add icons to buttons TODO: update to google icons
-        self.add_icon(res.find('img/load.png'), self.pushButton_main_load)
-        self.add_icon(res.find('img/rectangle.png'), self.pushButton_rect)
-        self.add_icon(res.find('img/circle.png'), self.pushButton_circle)
         self.add_icon(res.find('img/label.png'), self.pushButton_addCat)
-        self.add_icon(res.find('img/hand.png'), self.pushButton_hand)
-        self.add_icon(res.find('img/magic2.png'), self.pushButton_run)
+
+        self.add_icon(res.find('img/load.png'), self.actionLoad_image)
+        self.add_icon(res.find('img/rectangle.png'), self.actionRectangle_selection)
+        self.add_icon(res.find('img/hand.png'), self.actionHand_selector)
+        self.add_icon(res.find('img/brush.png'), self.actionBrush)
+        self.add_icon(res.find('img/test.png'), self.actionTest)
+        self.add_icon(res.find('img/magic2.png'), self.actionRun)
 
         self.image_loaded = False
 
@@ -78,12 +88,12 @@ class WEKAWindow(QtWidgets.QMainWindow):
         pushButton_object.setIcon(QtGui.QIcon(img_source))
 
     def create_connections(self):
-        # 'Simplify buttons'
-        self.pushButton_main_load.clicked.connect(self.get_image)
         self.pushButton_addCat.clicked.connect(self.add_cat)
-        self.pushButton_rect.clicked.connect(self.rectangle_selection)
-        self.pushButton_run.clicked.connect(self.go_segment)
-        self.pushButton_multirun.clicked.connect(self.generate_multi_outputs)
+        self.actionLoad_image.triggered.connect(self.get_image)
+        self.actionRectangle_selection.triggered.connect(self.rectangle_selection)
+        self.actionRun.triggered.connect(self.go_segment)
+        self.actionTest.triggered.connect(self.generate_multi_outputs)
+
         self.viewer.endDrawing.connect(self.add_roi)
         self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
 
@@ -101,7 +111,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         results = wk.weka_segment(img, self.training_labels)
         dest_path = self.image_path[:-4] + 'segmented.jpg'
 
-        results = skimage.color.label2rgb(results)
+        #results = skimage.color.label2rgb(results)
         skimage.io.imsave(dest_path, results)
 
         fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(9, 4))
@@ -137,7 +147,6 @@ class WEKAWindow(QtWidgets.QMainWindow):
         fig.tight_layout()
         plt.show()
 
-
     def add_cat(self):
         text, ok = QtWidgets.QInputDialog.getText(self, 'Text Input Dialog',
                                                   'Enter name of category:')
@@ -145,8 +154,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
             self.comboBox_cat.addItem(text)
             self.comboBox_cat.setEnabled(True)
             if self.image_loaded:
-                self.pushButton_rect.setEnabled(True)
-                self.pushButton_circle.setEnabled(True)
+                self.actionRectangle_selection.setEnabled(True)
 
             # add header to ROI list
             self.add_item_in_tree(self.model, text)
@@ -186,10 +194,14 @@ class WEKAWindow(QtWidgets.QMainWindow):
         print(self.active_category.roi_list)
 
         # switch back to hand tool
-        self.pushButton_hand.setChecked(True)
+        self.actionHand_selector.setChecked(True)
+
+        self.actionRun.setEnabled(True)
+        self.actionTest.setEnabled(True)
+
 
     def rectangle_selection(self):
-        if self.pushButton_rect.isChecked():
+        if self.actionRectangle_selection.isChecked():
             # transmit categories
             self.viewer.setCat(self.active_category, self.categories)
 
@@ -214,14 +226,11 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.viewer.setPhoto(QtGui.QPixmap(path))
         self.image_loaded = True
 
-        self.pushButton_hand.setEnabled(True)
-        self.pushButton_hand.setChecked(True)
+        self.actionHand_selector.setEnabled(True)
+        self.actionHand_selector.setChecked(True)
 
         if self.comboBox_cat.count() > 0:
-            self.pushButton_rect.setEnabled(True)
-            self.pushButton_circle.setEnabled(True)
-
-
+            self.actionRectangle_selection.setEnabled(True)
 
     def add_item_in_tree(self, parent, line):
         item = QtGui.QStandardItem(line)
@@ -245,7 +254,7 @@ def main(argv=None):
     # create the application if necessary
     if (not QtWidgets.QApplication.instance()):
         app = QtWidgets.QApplication(argv)
-        app.setStyle('QtCurve')
+        app.setStyle('Fusion')
 
     # create the main window
 
