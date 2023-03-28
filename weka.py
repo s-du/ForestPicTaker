@@ -1,12 +1,25 @@
 
-import skimage.io
 from skimage import io,data, segmentation, feature, future
 from sklearn.ensemble import RandomForestClassifier
 from functools import partial
+import numpy as np
+
+def generate_training(img_array, categories):
+    training_labels = np.zeros(img_array.shape[:2], dtype=np.uint8)
+
+    for i, cat in enumerate(categories):
+        for roi in cat.roi_list:
+            start_x = int(roi[0].x())
+            start_y = int(roi[0].y())
+            end_x = int(roi[1].x())
+            end_y = int(roi[1].y())
+
+            training_labels[start_y:end_y, start_x:end_x] = i + 1
+
+    return training_labels
 
 
-
-def weka_segment(img_array, training_labels):
+def weka_segment(img_array, training_labels, sigma_min=1, sigma_max=16,edges=False, texture=True):
     # Build an array of labels for training the segmentation.
     # Here we use rectangles but visualization libraries such as plotly
     # (and napari?) can be used to draw a mask on the image.
@@ -20,10 +33,8 @@ def weka_segment(img_array, training_labels):
     training_labels[150:200, 720:860] = 4
     """
 
-    sigma_min = 1
-    sigma_max = 16
     features_func = partial(feature.multiscale_basic_features,
-                            intensity=True, edges=False, texture=True,
+                            intensity=True, edges=edges, texture=texture,
                             sigma_min=sigma_min, sigma_max=sigma_max,
                             channel_axis=-1)
     features = features_func(img_array)

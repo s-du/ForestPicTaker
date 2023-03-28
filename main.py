@@ -46,6 +46,8 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.image_array = []
         self.image_path = ''
 
+        self.training_labels = None
+
         # Add icons to buttons TODO: update to google icons
         self.add_icon(res.find('img/load.png'), self.pushButton_main_load)
         self.add_icon(res.find('img/rectangle.png'), self.pushButton_rect)
@@ -81,6 +83,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.pushButton_addCat.clicked.connect(self.add_cat)
         self.pushButton_rect.clicked.connect(self.rectangle_selection)
         self.pushButton_run.clicked.connect(self.go_segment)
+        self.pushButton_multirun.clicked.connect(self.generate_multi_outputs)
         self.viewer.endDrawing.connect(self.add_roi)
         self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
 
@@ -93,30 +96,47 @@ class WEKAWindow(QtWidgets.QMainWindow):
     def go_segment(self):
         # load image
         img = self.image_array
-        training_labels = np.zeros(img.shape[:2], dtype=np.uint8)
+        self.training_labels = wk.generate_training(img, self.categories)
 
-        for i, cat in enumerate(self.categories):
-            for roi in cat.roi_list:
-                start_x = int(roi[0].x())
-                start_y = int(roi[0].y())
-                end_x = int(roi[1].x())
-                end_y = int(roi[1].y())
-
-                training_labels[start_y:end_y, start_x:end_x] = i+1
-
-        results = wk.weka_segment(img, training_labels)
+        results = wk.weka_segment(img, self.training_labels)
         dest_path = self.image_path[:-4] + 'segmented.jpg'
 
-        skimage.io.imsave(dest_path, results*10)
+        results = skimage.color.label2rgb(results)
+        skimage.io.imsave(dest_path, results)
 
         fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(9, 4))
         ax[0].imshow(segmentation.mark_boundaries(img, results, mode='thick'))
-        ax[0].contour(training_labels)
+        ax[0].contour(self.training_labels)
         ax[0].set_title('Image, mask and segmentation boundaries')
         ax[1].imshow(results)
         ax[1].set_title('Segmentation')
         fig.tight_layout()
         plt.show()
+
+    def generate_multi_outputs(self):
+        img = self.image_array
+        results = []
+        test_edges = [True, False]
+        test_sigma_min = [0.5, 2]
+        test_sigma_max = [4, 16]
+
+        if self.training_labels == None:
+            self.training_labels = wk.generate_training(img, self.categories)
+
+        for test_e in test_edges:
+            for test_s_min in test_sigma_min:
+                for test_s_max in test_sigma_max:
+                    result = wk.weka_segment(img, self.training_labels, edges=test_e, sigma_min = test_s_min,
+                                                  sigma_max = test_s_max)
+                    results.append(result)
+
+        fig, ax = plt.subplots(1, 8, sharex=True, sharey=True, figsize=(12, 4))
+        for i,a in enumerate(ax):
+            img = results[i]
+            a.imshow(img, interpolation='none')
+        fig.tight_layout()
+        plt.show()
+
 
     def add_cat(self):
         text, ok = QtWidgets.QInputDialog.getText(self, 'Text Input Dialog',
