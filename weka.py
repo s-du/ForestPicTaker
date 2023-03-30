@@ -1,4 +1,3 @@
-
 from skimage import io,data, segmentation, feature, future
 from sklearn.ensemble import RandomForestClassifier
 from functools import partial

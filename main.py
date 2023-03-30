@@ -1,16 +1,21 @@
-import skimage.io
+# imports
 from PySide6 import QtWidgets, QtGui, QtCore
-
+from skimage import io, data, segmentation, feature, future
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('qtagg') # for avoiding problems with pyinstaller
 import os
+
+# custom libraries
 import widgets as wid
 import weka as wk
 import resources as res
 
-from skimage import data, segmentation, feature, future
-import matplotlib.pyplot as plt
-
 
 class PixelCategory:
+    """
+    Class to describe a segmentation category
+    """
     def __init__(self):
         self.nb_roi_rect = 0
         self.nb_roi_brush = 0
@@ -23,7 +28,7 @@ class PixelCategory:
 
 class WEKAWindow(QtWidgets.QMainWindow):
     """
-    Main Window class for the Pointify application.
+    Main Window class for the ForestPixMapper application.
     """
 
     def __init__(self, parent=None):
@@ -40,14 +45,18 @@ class WEKAWindow(QtWidgets.QMainWindow):
         print(uifile)
         wid.loadUi(uifile, self)
 
+        self.image_array = []
+        self.image_path = ''
+        self.image_loaded = False
+
         # define categories
         self.categories = []
         self.active_category = None
-
-        self.image_array = []
-        self.image_path = ''
-
         self.training_labels = None
+
+        # Create model (for the tree structure)
+        self.model = QtGui.QStandardItemModel()
+        self.treeView.setModel(self.model)
 
         # add actions to action group
         ag = QtGui.QActionGroup(self)
@@ -56,8 +65,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         ag.addAction(self.actionHand_selector)
         ag.addAction(self.actionBrush)
 
-
-        # Add icons to buttons TODO: update to google icons
+        # Add icons to buttons
         self.add_icon(res.find('img/label.png'), self.pushButton_addCat)
 
         self.add_icon(res.find('img/load.png'), self.actionLoad_image)
@@ -65,22 +73,31 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.add_icon(res.find('img/hand.png'), self.actionHand_selector)
         self.add_icon(res.find('img/brush.png'), self.actionBrush)
         self.add_icon(res.find('img/test.png'), self.actionTest)
-        self.add_icon(res.find('img/magic2.png'), self.actionRun)
-
-        self.image_loaded = False
-
-        # tools initialization
-        self.rect_active = False
+        self.add_icon(res.find('img/forest.png'), self.actionRun)
 
         self.viewer = wid.PhotoViewer(self)
         self.horizontalLayout.addWidget(self.viewer)
 
+        # create connections (signals)
+        self.create_connections()
+
+
+    def reset_parameters(self):
+        """
+        Reset all model parameters (image and categories)
+        """
+        self.image_array = []
+        self.image_path = ''
+        self.image_loaded = False
+
+        # define categories
+        self.categories = []
+        self.active_category = None
+        self.training_labels = None
+
         # Create model (for the tree structure)
         self.model = QtGui.QStandardItemModel()
         self.treeView.setModel(self.model)
-
-        # create connections (signals)
-        self.create_connections()
 
     def add_icon(self, img_source, pushButton_object):
         """
@@ -89,6 +106,9 @@ class WEKAWindow(QtWidgets.QMainWindow):
         pushButton_object.setIcon(QtGui.QIcon(img_source))
 
     def create_connections(self):
+        """
+        Link signals to slots
+        """
         self.pushButton_addCat.clicked.connect(self.add_cat)
         self.actionLoad_image.triggered.connect(self.get_image)
         self.actionRectangle_selection.triggered.connect(self.rectangle_selection)
@@ -101,21 +121,28 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
 
     def on_cat_change(self):
+        """
+        When the combobox to choose a segmentation category is activated
+        """
         self.active_i = self.comboBox_cat.currentIndex()
         if self.categories:
             self.active_category = self.categories[self.active_i]
-            print(self.active_category)
+            print(f"the active segmentation category is {self.active_category}")
 
     def go_segment(self):
+        """
+        Launch the segmentation
+        """
         # load image
         img = self.image_array
+        # generate training data
         self.training_labels = wk.generate_training(img, self.categories)
 
         results = wk.weka_segment(img, self.training_labels)
         dest_path = self.image_path[:-4] + 'segmented.jpg'
 
         #results = skimage.color.label2rgb(results)
-        skimage.io.imsave(dest_path, results)
+        io.imsave(dest_path, results)
 
         fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(9, 4))
         ax[0].imshow(segmentation.mark_boundaries(img, results, mode='thick'))
@@ -127,6 +154,9 @@ class WEKAWindow(QtWidgets.QMainWindow):
         plt.show()
 
     def generate_multi_outputs(self):
+        """
+        Launch an analysis with different segmentation parameters
+        """
         img = self.image_array
         results = []
         test_edges = [True, False]
@@ -151,6 +181,9 @@ class WEKAWindow(QtWidgets.QMainWindow):
         plt.show()
 
     def add_cat(self):
+        """
+        Add a segmentation category (eg. 'wood', 'bricks', ...)
+        """
         text, ok = QtWidgets.QInputDialog.getText(self, 'Text Input Dialog',
                                                   'Enter name of category:')
         if ok:
@@ -182,6 +215,11 @@ class WEKAWindow(QtWidgets.QMainWindow):
             self.on_cat_change()
 
     def add_roi_brush(self, nb):
+        """
+        Add a region of interest coming from the brush tool
+        :param nb: number of existing roi's
+        """
+        # find the parent item in the treeview (the active category)
         brush_item = self.model.findItems(self.active_category.name)
         cat_from_gui = self.viewer.getCurrentCat()
 
@@ -200,6 +238,10 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.actionTest.setEnabled(True)
 
     def add_roi_rect(self, nb):
+        """
+        Add a region of interest coming from the rectangle tool
+        :param nb: number of existing roi's
+        """
         # add roi item
         # find name in model
         rect_item = self.model.findItems(self.active_category.name)
@@ -208,7 +250,10 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.active_category.nb_roi_rect = cat_from_gui.nb_roi_rect
         self.active_category.roi_list_rect = cat_from_gui.roi_list_rect
         nb_roi = self.active_category.nb_roi_rect
+        # create description name
         desc = 'rect_zone' + str(nb_roi)
+
+        # get size of roi
 
         self.add_item_in_tree(rect_item[0], desc)
         self.categories[self.active_i] = self.active_category
@@ -216,6 +261,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # switch back to hand tool
         self.actionHand_selector.setChecked(True)
 
+        # enable actions
         self.actionRun.setEnabled(True)
         self.actionTest.setEnabled(True)
 
@@ -245,23 +291,39 @@ class WEKAWindow(QtWidgets.QMainWindow):
             self.viewer.toggleDragMode()
 
     def get_image(self):
-        img = QtWidgets.QFileDialog.getOpenFileName(self, u"Ouverture de fichiers","", "Image Files (*.png *.jpg *.bmp)")
-        if not img:
-            return
-        self.load_image(img[0])
+        """
+        Get the image path from the user
+        :return:
+        """
+        try:
+            img = QtWidgets.QFileDialog.getOpenFileName(self, u"Ouverture de fichiers","", "Image Files (*.png *.jpg *.bmp)")
+            print(f'the following image will be loaded {img[0]}')
+        except:
+            pass
+        if img[0] != '':
+            # load and show new image
+            self.load_image(img[0])
 
     def load_image(self, path):
-        print(path)
+        """
+        Load the new image and reset the model
+        :param path:
+        :return:
+        """
+        self.reset_parameters()
+
         self.image_path = path
-        self.image_array = skimage.io.imread(path)
+        self.image_array = io.imread(path)
         self.viewer.setPhoto(QtGui.QPixmap(path))
         self.image_loaded = True
 
+        # enable action
+        self.pushButton_addCat.setEnabled(True)
         self.actionHand_selector.setEnabled(True)
         self.actionHand_selector.setChecked(True)
 
-        if self.comboBox_cat.count() > 0:
-            self.actionRectangle_selection.setEnabled(True)
+        # reset parameters
+
 
     def add_item_in_tree(self, parent, line):
         item = QtGui.QStandardItem(line)
