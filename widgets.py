@@ -5,6 +5,7 @@ from PySide6.QtUiTools import QUiLoader
 
 import os
 import numpy as np
+import resources as res
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
@@ -179,6 +180,12 @@ class PhotoViewer(QGraphicsView):
         self._current_path_item = None
         self._current_path = None
 
+        # define custom cursor
+        cur_img = res.find('img/circle.png')
+        self.cur_pixmap = QPixmap(cur_img)
+        pixmap_scaled = self.cur_pixmap.scaledToWidth(12)
+        self.brush_cur = QCursor(pixmap_scaled)
+
         self.pen = QPen()
         # self.pen.setStyle(Qt.DashDotLine)
         self.pen.setWidth(4)
@@ -214,6 +221,14 @@ class PhotoViewer(QGraphicsView):
                 self.scale(factor, factor)
             self._zoom = 0
 
+    def clean_scene(self):
+        for item in self._scene.items():
+            print(type(item))
+            if isinstance(item, QGraphicsPathItem):
+                self._scene.removeItem(item)
+            elif isinstance(item, QGraphicsRectItem):
+                self._scene.removeItem(item)
+
     def setPhoto(self, pixmap=None):
         self._zoom = 0
         if pixmap and not pixmap.isNull():
@@ -226,7 +241,8 @@ class PhotoViewer(QGraphicsView):
             self._photo.setPixmap(QPixmap())
         self.fitInView()
 
-
+    def change_to_brush_cursor(self):
+        self.setCursor(self.brush_cur)
 
     def toggleDragMode(self):
         if not self.rect or self.painting:
@@ -258,21 +274,20 @@ class PhotoViewer(QGraphicsView):
 
     # mouse events
     def wheelEvent(self, event):
-        if not self.rect:
-            print(self._zoom)
-            if self.has_photo():
-                if event.angleDelta().y() > 0:
-                    factor = 1.25
-                    self._zoom += 1
-                else:
-                    factor = 0.8
-                    self._zoom -= 1
-                if self._zoom > 0:
-                    self.scale(factor, factor)
-                elif self._zoom == 0:
-                    self.fitInView()
-                else:
-                    self._zoom = 0
+        print(self._zoom)
+        if self.has_photo():
+            if event.angleDelta().y() > 0:
+                factor = 1.25
+                self._zoom += 1
+            else:
+                factor = 0.8
+                self._zoom -= 1
+            if self._zoom > 0:
+                self.scale(factor, factor)
+            elif self._zoom == 0:
+                self.fitInView()
+            else:
+                self._zoom = 0
 
     def mousePressEvent(self, event):
         if self.rect:
@@ -341,14 +356,11 @@ class PhotoViewer(QGraphicsView):
                 coords = np.column_stack(np.where(gray > 2))
 
                 bb_rect = self._current_path_item.sceneBoundingRect()
-                print(bb_rect)
                 top_left = bb_rect.topLeft()
-                print(f'top_left = {top_left}')
+
                 limit_row = int(top_left.x())
                 limit_col = int(top_left.y())
-
                 print(f'limits = {limit_row}, {limit_col}')
-
 
                 coords[:, 0] += limit_col
                 coords[:, 1] += limit_row

@@ -140,6 +140,7 @@
    <addaction name="actionHand_selector"/>
    <addaction name="actionRectangle_selection"/>
    <addaction name="actionBrush"/>
+   <addaction name="actionReset_all"/>
    <addaction name="separator"/>
    <addaction name="actionRun"/>
    <addaction name="actionTest"/>
@@ -216,6 +217,14 @@
    </property>
    <property name="toolTip">
     <string>Test parameters combination</string>
+   </property>
+  </action>
+  <action name="actionReset_all">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Reset all</string>
    </property>
   </action>
  </widget>

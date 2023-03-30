@@ -28,7 +28,7 @@ class PixelCategory:
 
 class WEKAWindow(QtWidgets.QMainWindow):
     """
-    Main Window class for the ForestPixMapper application.
+    Main Window class for the ForestPicTaker application.
     """
 
     def __init__(self, parent=None):
@@ -58,6 +58,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.model = QtGui.QStandardItemModel()
         self.treeView.setModel(self.model)
 
+
         # add actions to action group
         ag = QtGui.QActionGroup(self)
         ag.setExclusive(True)
@@ -74,6 +75,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.add_icon(res.find('img/brush.png'), self.actionBrush)
         self.add_icon(res.find('img/test.png'), self.actionTest)
         self.add_icon(res.find('img/forest.png'), self.actionRun)
+        self.add_icon(res.find('img/reset.png'), self.actionReset_all)
 
         self.viewer = wid.PhotoViewer(self)
         self.horizontalLayout.addWidget(self.viewer)
@@ -115,6 +117,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.actionBrush.triggered.connect(self.brush_selection)
         self.actionRun.triggered.connect(self.go_segment)
         self.actionTest.triggered.connect(self.generate_multi_outputs)
+        self.actionReset_all.triggered.connect(self.reset_roi)
 
         self.viewer.endDrawing_rect.connect(self.add_roi_rect)
         self.viewer.endDrawing_brush.connect(self.add_roi_brush)
@@ -128,6 +131,26 @@ class WEKAWindow(QtWidgets.QMainWindow):
         if self.categories:
             self.active_category = self.categories[self.active_i]
             print(f"the active segmentation category is {self.active_category}")
+
+    def reset_roi(self):
+        # clean tree view
+        self.model = QtGui.QStandardItemModel()
+        self.treeView.setModel(self.model)
+        self.model.setHeaderData(0, QtCore.Qt.Horizontal, 'Categories')
+
+        # clean roi in each cat
+        for cat in self.categories:
+            cat.nb_roi_rect = 0
+            cat.nb_roi_brush = 0
+            cat.item_list_rect = []
+            cat.item_list_brush = []
+            cat.roi_list_rect = []
+            cat.roi_list_brush = []
+
+            self.add_item_in_tree(self.model, cat.name)
+
+        # clean graphicscene
+        self.viewer.clean_scene()
 
     def go_segment(self):
         """
@@ -188,32 +211,34 @@ class WEKAWindow(QtWidgets.QMainWindow):
         text, ok = QtWidgets.QInputDialog.getText(self, 'Text Input Dialog',
                                                   'Enter name of category:')
         if ok:
-            self.comboBox_cat.addItem(text)
-            self.comboBox_cat.setEnabled(True)
-            if self.image_loaded:
-                self.actionRectangle_selection.setEnabled(True)
-                self.actionBrush.setEnabled(True)
-
-            # add header to ROI list
-            self.add_item_in_tree(self.model, text)
-            cat = PixelCategory()
-            cat.name = text
-
-            self.model.setHeaderData(0, QtCore.Qt.Horizontal, 'Categories')
-
             # add color
             color = QtWidgets.QColorDialog.getColor()
-            cat.color = color
+            print(color.rgb())
+            if color.isValid():
+                # add category to combobox
+                self.comboBox_cat.addItem(text)
+                self.comboBox_cat.setEnabled(True)
 
-            # add classification category to list of categories
-            self.categories.append(cat)
+                # add header to ROI list
+                self.add_item_in_tree(self.model, text)
+                self.model.setHeaderData(0, QtCore.Qt.Horizontal, 'Categories')
 
+                # create category class
+                cat = PixelCategory()
+                cat.name = text
+                cat.color = color
 
-            # select combobox
-            nb_cat = len(self.categories)
-            self.comboBox_cat.setCurrentIndex(nb_cat-1)
+                # add classification category to list of categories
+                self.categories.append(cat)
 
-            self.on_cat_change()
+                # activate tools
+                self.actionBrush.setEnabled(True)
+                self.actionRectangle_selection.setEnabled(True)
+
+                # select new cat in combobox
+                nb_cat = len(self.categories)
+                self.comboBox_cat.setCurrentIndex(nb_cat-1)
+                self.on_cat_change()
 
     def add_roi_brush(self, nb):
         """
@@ -231,12 +256,14 @@ class WEKAWindow(QtWidgets.QMainWindow):
 
         self.add_item_in_tree(brush_item[0], desc)
         self.categories[self.active_i] = self.active_category
+        self.treeView.expandAll()
 
         # switch back to hand tool
         self.hand_pan()
 
         self.actionRun.setEnabled(True)
         self.actionTest.setEnabled(True)
+        self.actionReset_all.setEnabled(True)
 
     def add_roi_rect(self, nb):
         """
@@ -258,6 +285,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
 
         self.add_item_in_tree(rect_item[0], desc)
         self.categories[self.active_i] = self.active_category
+        self.treeView.expandAll()
 
         # switch back to hand tool
         self.hand_pan()
@@ -265,6 +293,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # enable actions
         self.actionRun.setEnabled(True)
         self.actionTest.setEnabled(True)
+        self.actionReset_all.setEnabled(True)
 
     def hand_pan(self):
         # switch back to hand tool
@@ -281,6 +310,9 @@ class WEKAWindow(QtWidgets.QMainWindow):
 
             # define color of rectangle selection
             color = self.active_category.color
+
+            # change cursor
+            self.viewer.change_to_brush_cursor()
 
             # activate drawing tool
             self.viewer.pen.setColor(color)
