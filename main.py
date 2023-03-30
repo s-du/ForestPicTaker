@@ -135,6 +135,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         """
         # load image
         img = self.image_array
+        img = wk.rgba2rgb(img)
         # generate training data
         self.training_labels = wk.generate_training(img, self.categories)
 
@@ -221,7 +222,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         """
         # find the parent item in the treeview (the active category)
         brush_item = self.model.findItems(self.active_category.name)
-        cat_from_gui = self.viewer.getCurrentCat()
+        cat_from_gui = self.viewer.get_current_cat()
 
         self.active_category.nb_roi_brush = cat_from_gui.nb_roi_brush
         self.active_category.roi_list_brush = cat_from_gui.roi_list_brush
@@ -232,7 +233,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.categories[self.active_i] = self.active_category
 
         # switch back to hand tool
-        self.actionHand_selector.setChecked(True)
+        self.hand_pan()
 
         self.actionRun.setEnabled(True)
         self.actionTest.setEnabled(True)
@@ -246,7 +247,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # find name in model
         rect_item = self.model.findItems(self.active_category.name)
 
-        cat_from_gui = self.viewer.getCurrentCat()
+        cat_from_gui = self.viewer.get_current_cat()
         self.active_category.nb_roi_rect = cat_from_gui.nb_roi_rect
         self.active_category.roi_list_rect = cat_from_gui.roi_list_rect
         nb_roi = self.active_category.nb_roi_rect
@@ -259,15 +260,24 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.categories[self.active_i] = self.active_category
 
         # switch back to hand tool
-        self.actionHand_selector.setChecked(True)
+        self.hand_pan()
 
         # enable actions
         self.actionRun.setEnabled(True)
         self.actionTest.setEnabled(True)
 
+    def hand_pan(self):
+        # switch back to hand tool
+        self.actionHand_selector.setChecked(True)
+        # activate combobox
+        self.comboBox_cat.setEnabled(True)
+
     def brush_selection(self):
         if self.actionBrush.isChecked():
-            self.viewer.setCat(self.active_category, self.categories)
+            self.viewer.set_cat(self.active_category, self.categories)
+
+            # desactivate combobox
+            self.comboBox_cat.setEnabled(False)
 
             # define color of rectangle selection
             color = self.active_category.color
@@ -280,7 +290,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
     def rectangle_selection(self):
         if self.actionRectangle_selection.isChecked():
             # transmit categories
-            self.viewer.setCat(self.active_category, self.categories)
+            self.viewer.set_cat(self.active_category, self.categories)
 
             # define color of rectangle selection
             color = self.active_category.color
@@ -321,8 +331,6 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.pushButton_addCat.setEnabled(True)
         self.actionHand_selector.setEnabled(True)
         self.actionHand_selector.setChecked(True)
-
-        # reset parameters
 
 
     def add_item_in_tree(self, parent, line):

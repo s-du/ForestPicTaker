@@ -3,6 +3,29 @@ from sklearn.ensemble import RandomForestClassifier
 from functools import partial
 import numpy as np
 
+
+def rgba2rgb(rgba, background=(255, 255, 255)):
+    row, col, ch = rgba.shape
+
+    if ch == 3:
+        return rgba
+
+    assert ch == 4, 'RGBA image has 4 channels.'
+
+    rgb = np.zeros((row, col, 3), dtype='float32' )
+    r, g, b, a = rgba[:,:,0], rgba[:,:,1], rgba[:,:,2], rgba[:,:,3]
+
+    a = np.asarray( a, dtype='float32' ) / 255.0
+
+    R, G, B = background
+
+    rgb[:,:,0] = r * a + (1.0 - a) * R
+    rgb[:,:,1] = g * a + (1.0 - a) * G
+    rgb[:,:,2] = b * a + (1.0 - a) * B
+
+    return np.asarray( rgb, dtype='uint8' )
+
+
 def generate_training(img_array, categories):
     training_labels = np.zeros(img_array.shape[:2], dtype=np.uint8)
 
@@ -18,6 +41,15 @@ def generate_training(img_array, categories):
             for j in range(len(roi[:, 1])):
                 # take line by line, each line is a coordinate couple
                 coord = roi[j, :]
+
+                print(len(training_labels[:,1]))
+                print(len(training_labels[1, :]))
+                if coord[0] >= len(training_labels[:,1]):
+                    coord[0] = len(training_labels[:,1])-1
+
+                if coord[1] >= len(training_labels[1,:]):
+                    coord[1] = len(training_labels[1,:])-1
+
                 training_labels[coord[0], coord[1]] = i + 1
 
 

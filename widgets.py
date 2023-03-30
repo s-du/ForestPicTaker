@@ -118,7 +118,13 @@ def loadUi(uifile, baseinstance=None, customWidgets=None,
     QMetaObject.connectSlotsByName(widget)
     return widget
 
+
 def QPixmapFromItem(item):
+    """
+    Transform a QGraphicsitem into a Pixmap
+    :param item: QGraphicsItem
+    :return: QPixmap
+    """
     pixmap = QPixmap(item.boundingRect().size().toSize())
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
@@ -183,9 +189,7 @@ class PhotoViewer(QGraphicsView):
         self.categories = None
         self.active_category = None
 
-
-
-    def hasPhoto(self):
+    def has_photo(self):
         return not self._empty
 
     def showEvent(self, event):
@@ -197,7 +201,7 @@ class PhotoViewer(QGraphicsView):
         print(rect)
         if not rect.isNull():
             self.setSceneRect(rect)
-            if self.hasPhoto():
+            if self.has_photo():
                 unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
                 print('unity: ', unity)
                 self.scale(1 / unity.width(), 1 / unity.height())
@@ -222,10 +226,41 @@ class PhotoViewer(QGraphicsView):
             self._photo.setPixmap(QPixmap())
         self.fitInView()
 
+
+
+    def toggleDragMode(self):
+        if not self.rect or self.painting:
+            if self.dragMode() == QGraphicsView.ScrollHandDrag:
+                self.setDragMode(QGraphicsView.NoDrag)
+            elif not self._photo.pixmap().isNull():
+                self.setDragMode(QGraphicsView.ScrollHandDrag)
+        else:
+            self.setDragMode(QGraphicsView.NoDrag)
+
+    def get_current_cat(self):
+        return self.active_category
+
+    def get_coord(self, QGraphicsRect):
+        rect = QGraphicsRect.rect()
+        coord = [rect.topLeft(), rect.bottomRight()]
+        print(coord)
+
+        return coord
+
+    def set_cat(self, cat, categories):
+        self.active_category = cat
+        self.categories = categories
+
+    def redraw_all_items(self):
+        for cat in self.categories:
+            for item in cat.item_list_rect:
+                self._scene.addItem(item)
+
+    # mouse events
     def wheelEvent(self, event):
         if not self.rect:
             print(self._zoom)
-            if self.hasPhoto():
+            if self.has_photo():
                 if event.angleDelta().y() > 0:
                     factor = 1.25
                     self._zoom += 1
@@ -238,35 +273,6 @@ class PhotoViewer(QGraphicsView):
                     self.fitInView()
                 else:
                     self._zoom = 0
-
-    def toggleDragMode(self):
-        if not self.rect or self.painting:
-            if self.dragMode() == QGraphicsView.ScrollHandDrag:
-                self.setDragMode(QGraphicsView.NoDrag)
-            elif not self._photo.pixmap().isNull():
-                self.setDragMode(QGraphicsView.ScrollHandDrag)
-        else:
-            self.setDragMode(QGraphicsView.NoDrag)
-
-    def getCurrentCat(self):
-        return self.active_category
-
-    def getCoord(self, QGraphicsRect):
-        rect = QGraphicsRect.rect()
-        coord = [rect.topLeft(), rect.bottomRight()]
-        print(coord)
-
-        return coord
-
-    def setCat(self, cat, categories):
-        self.active_category = cat
-        self.categories = categories
-
-
-    def redraw_all_items(self):
-        for cat in self.categories:
-            for item in cat.item_list_rect:
-                self._scene.addItem(item)
 
     def mousePressEvent(self, event):
         if self.rect:
@@ -316,7 +322,7 @@ class PhotoViewer(QGraphicsView):
             self.rect = False
             self.origin = QPoint()
             if self._current_rect_item is not None:
-                coord = self.getCoord(self._current_rect_item)
+                coord = self.get_coord(self._current_rect_item)
                 print(self.active_category)
                 self.active_category.roi_list_rect.append(coord)
                 self.active_category.nb_roi_rect += 1
@@ -326,18 +332,23 @@ class PhotoViewer(QGraphicsView):
             self.toggleDragMode()
 
         elif self.painting:
-
             if self._current_path_item is not None:
                 # create pixmap from item
                 pixmap = QPixmapFromItem(self._current_path_item)
                 image = QPixmapToArray(pixmap)
-                print(image)
-
                 gray = np.dot(image[...,:3], [0.2989, 0.5870, 0.1140])
-                print(gray)
+
                 coords = np.column_stack(np.where(gray > 2))
-                limit_row = int(self.origin.x())
-                limit_col = int(self.origin.y())
+
+                bb_rect = self._current_path_item.sceneBoundingRect()
+                print(bb_rect)
+                top_left = bb_rect.topLeft()
+                print(f'top_left = {top_left}')
+                limit_row = int(top_left.x())
+                limit_col = int(top_left.y())
+
+                print(f'limits = {limit_row}, {limit_col}')
+
 
                 coords[:, 0] += limit_col
                 coords[:, 1] += limit_row
@@ -351,8 +362,6 @@ class PhotoViewer(QGraphicsView):
             self.origin = QPoint()
             self._current_path_item = None
             self.toggleDragMode()
-
-
         super(PhotoViewer, self).mouseReleaseEvent(event)
 
 
