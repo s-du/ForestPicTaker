@@ -101,6 +101,12 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.model = QtGui.QStandardItemModel()
         self.treeView.setModel(self.model)
 
+        # clean graphicscene
+        self.viewer.clean_scene()
+
+        # clean combobox
+        self.comboBox_cat.clear()
+
     def add_icon(self, img_source, pushButton_object):
         """
         Function to add an icon to a pushButton
@@ -136,7 +142,6 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # clean tree view
         self.model = QtGui.QStandardItemModel()
         self.treeView.setModel(self.model)
-        self.model.setHeaderData(0, QtCore.Qt.Horizontal, 'Categories')
 
         # clean roi in each cat
         for cat in self.categories:
@@ -148,6 +153,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
             cat.roi_list_brush = []
 
             self.add_item_in_tree(self.model, cat.name)
+            self.model.setHeaderData(0, QtCore.Qt.Horizontal, 'Categories')
 
         # clean graphicscene
         self.viewer.clean_scene()
