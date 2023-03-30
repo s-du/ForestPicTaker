@@ -1,6 +1,6 @@
 # imports
 from PySide6 import QtWidgets, QtGui, QtCore
-from skimage import io, data, segmentation, feature, future
+from skimage import color, io, data, segmentation, feature, future
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('qtagg') # for avoiding problems with pyinstaller
@@ -53,11 +53,11 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.categories = []
         self.active_category = None
         self.training_labels = None
+        self.model_available = False
 
         # Create model (for the tree structure)
         self.model = QtGui.QStandardItemModel()
         self.treeView.setModel(self.model)
-
 
         # add actions to action group
         ag = QtGui.QActionGroup(self)
@@ -83,7 +83,6 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # create connections (signals)
         self.create_connections()
 
-
     def reset_parameters(self):
         """
         Reset all model parameters (image and categories)
@@ -107,37 +106,6 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # clean combobox
         self.comboBox_cat.clear()
 
-    def add_icon(self, img_source, pushButton_object):
-        """
-        Function to add an icon to a pushButton
-        """
-        pushButton_object.setIcon(QtGui.QIcon(img_source))
-
-    def create_connections(self):
-        """
-        Link signals to slots
-        """
-        self.pushButton_addCat.clicked.connect(self.add_cat)
-        self.actionLoad_image.triggered.connect(self.get_image)
-        self.actionRectangle_selection.triggered.connect(self.rectangle_selection)
-        self.actionBrush.triggered.connect(self.brush_selection)
-        self.actionRun.triggered.connect(self.go_segment)
-        self.actionTest.triggered.connect(self.generate_multi_outputs)
-        self.actionReset_all.triggered.connect(self.reset_roi)
-
-        self.viewer.endDrawing_rect.connect(self.add_roi_rect)
-        self.viewer.endDrawing_brush.connect(self.add_roi_brush)
-        self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
-
-    def on_cat_change(self):
-        """
-        When the combobox to choose a segmentation category is activated
-        """
-        self.active_i = self.comboBox_cat.currentIndex()
-        if self.categories:
-            self.active_category = self.categories[self.active_i]
-            print(f"the active segmentation category is {self.active_category}")
-
     def reset_roi(self):
         # clean tree view
         self.model = QtGui.QStandardItemModel()
@@ -158,6 +126,70 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # clean graphicscene
         self.viewer.clean_scene()
 
+    def add_icon(self, img_source, pushButton_object):
+        """
+        Function to add an icon to a pushButton
+        """
+        pushButton_object.setIcon(QtGui.QIcon(img_source))
+
+    def create_connections(self):
+        """
+        Link signals to slots
+        """
+        self.pushButton_addCat.clicked.connect(self.add_cat)
+        self.actionLoad_image.triggered.connect(self.get_image)
+        self.actionRectangle_selection.triggered.connect(self.rectangle_selection)
+        self.actionBrush.triggered.connect(self.brush_selection)
+        self.actionRun.triggered.connect(self.go_segment)
+        self.actionTest.triggered.connect(self.generate_multi_outputs)
+        self.actionReset_all.triggered.connect(self.reset_roi)
+        self.actionApply_to_folder.triggered.connect(self.apply_to_folder)
+
+        self.viewer.endDrawing_rect.connect(self.add_roi_rect)
+        self.viewer.endDrawing_brush.connect(self.add_roi_brush)
+        self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
+
+    def apply_to_folder(self):
+        if self.model_available:
+            # dialog folder selection
+            folder = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select Directory"))
+
+            # analyse images
+            if not folder == "":  # if user cancel selection, stop function
+                self.main_folder = folder
+                self.app_folder = os.path.join(folder, 'ForestPicTaker_outputs')
+
+                if not os.path.exists(self.app_folder):
+                    os.mkdir(self.app_folder)
+
+                img_list = os.listdir(folder)
+                print(img_list)
+                img_paths = []
+
+                for img_file in img_list:
+                    if img_file.endswith('.jpg') or img_file.endswith('.JPG'):
+                        img_paths.append(os.path.join(folder, img_file))
+
+                for i, path in enumerate(img_paths):
+                    img_array = io.imread(path)
+                    img_array = wk.rgba2rgb(img_array)
+                    self.training_labels = wk.generate_training(img_array, self.categories)
+                    features_new = self.feat_func(img_array)
+                    results_new = future.predict_segmenter(features_new, self.clf)
+                    results = color.label2rgb(results_new)
+
+                    dest_path = os.path.join(self.app_folder, img_file)
+                    io.imsave(dest_path, results)
+
+    def on_cat_change(self):
+        """
+        When the combobox to choose a segmentation category is activated
+        """
+        self.active_i = self.comboBox_cat.currentIndex()
+        if self.categories:
+            self.active_category = self.categories[self.active_i]
+            print(f"the active segmentation category is {self.active_category}")
+
     def go_segment(self):
         """
         Launch the segmentation
@@ -168,11 +200,10 @@ class WEKAWindow(QtWidgets.QMainWindow):
         # generate training data
         self.training_labels = wk.generate_training(img, self.categories)
 
-        results = wk.weka_segment(img, self.training_labels)
+        self.clf, self.feat_func, results = wk.weka_segment(img, self.training_labels)
         dest_path = self.image_path[:-4] + 'segmented.jpg'
 
         #results = skimage.color.label2rgb(results)
-        io.imsave(dest_path, results)
 
         fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(9, 4))
         ax[0].imshow(segmentation.mark_boundaries(img, results, mode='thick'))
@@ -182,6 +213,9 @@ class WEKAWindow(QtWidgets.QMainWindow):
         ax[1].set_title('Segmentation')
         fig.tight_layout()
         plt.show()
+
+        self.model_available = True
+        self.actionApply_to_folder.setEnabled(True)
 
     def generate_multi_outputs(self):
         """

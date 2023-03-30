@@ -80,4 +80,4 @@ def weka_segment(img_array, training_labels, sigma_min=1, sigma_max=16,edges=Fal
     clf = future.fit_segmenter(training_labels, features, clf)
     result = future.predict_segmenter(features, clf)
 
-    return result
+    return clf, features_func, result
