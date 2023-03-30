@@ -145,6 +145,7 @@
    <addaction name="separator"/>
    <addaction name="actionRun"/>
    <addaction name="actionTest"/>
+   <addaction name="actionParameters"/>
   </widget>
   <action name="actionLoad_image">
    <property name="text">
@@ -234,6 +235,11 @@
   <action name="actionInfo">
    <property name="text">
     <string>Info</string>
+   </property>
+  </action>
+  <action name="actionParameters">
+   <property name="text">
+    <string>Parameters</string>
    </property>
   </action>
  </widget>

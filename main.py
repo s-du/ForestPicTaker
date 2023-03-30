@@ -26,6 +26,20 @@ class PixelCategory:
         self.color = None
         self.name = ''
 
+class AboutDialog(QtWidgets.QDialog):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle('What is this app about?')
+        self.layout = QtWidgets.QVBoxLayout()
+
+        about_text = QtWidgets.QLabel('This app was made by Buildwise, to simplify the use of one simple, '
+                                      'yet efficient, machine learning algorithm. Start by loading an image, '
+                                      'then adding a category.')
+        self.layout.addWidget(about_text)
+
+        self.setLayout(self.layout)
+
 class WEKAWindow(QtWidgets.QMainWindow):
     """
     Main Window class for the ForestPicTaker application.
@@ -76,6 +90,9 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.add_icon(res.find('img/test.png'), self.actionTest)
         self.add_icon(res.find('img/forest.png'), self.actionRun)
         self.add_icon(res.find('img/reset.png'), self.actionReset_all)
+        self.add_icon(res.find('img/settings.png'), self.actionParameters)
+        self.add_icon(res.find('img/folder.png'), self.actionApply_to_folder)
+        self.add_icon(res.find('img/info.png'), self.actionInfo)
 
         self.viewer = wid.PhotoViewer(self)
         self.horizontalLayout.addWidget(self.viewer)
@@ -144,10 +161,16 @@ class WEKAWindow(QtWidgets.QMainWindow):
         self.actionTest.triggered.connect(self.generate_multi_outputs)
         self.actionReset_all.triggered.connect(self.reset_roi)
         self.actionApply_to_folder.triggered.connect(self.apply_to_folder)
+        self.actionInfo.triggered.connect(self.show_info)
 
         self.viewer.endDrawing_rect.connect(self.add_roi_rect)
         self.viewer.endDrawing_brush.connect(self.add_roi_brush)
         self.comboBox_cat.currentIndexChanged.connect(self.on_cat_change)
+
+    def show_info(self):
+        dialog = AboutDialog()
+        if dialog.exec_():
+            pass
 
     def apply_to_folder(self):
         if self.model_available:
@@ -163,13 +186,13 @@ class WEKAWindow(QtWidgets.QMainWindow):
                     os.mkdir(self.app_folder)
 
                 img_list = os.listdir(folder)
-                print(img_list)
                 img_paths = []
 
                 for img_file in img_list:
                     if img_file.endswith('.jpg') or img_file.endswith('.JPG'):
                         img_paths.append(os.path.join(folder, img_file))
 
+                print(img_paths)
                 for i, path in enumerate(img_paths):
                     img_array = io.imread(path)
                     img_array = wk.rgba2rgb(img_array)
@@ -178,7 +201,7 @@ class WEKAWindow(QtWidgets.QMainWindow):
                     results_new = future.predict_segmenter(features_new, self.clf)
                     results = color.label2rgb(results_new)
 
-                    dest_path = os.path.join(self.app_folder, img_file)
+                    dest_path = os.path.join(self.app_folder, f'segmented_{i}.jpg')
                     io.imsave(dest_path, results)
 
     def on_cat_change(self):
