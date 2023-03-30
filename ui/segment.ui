@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>801</width>
     <height>486</height>
    </rect>
   </property>
@@ -15,7 +15,7 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
-    <item row="1" column="0">
+    <item row="2" column="0">
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
        <widget class="QComboBox" name="comboBox_cat">
@@ -54,8 +54,34 @@
       </item>
      </layout>
     </item>
-    <item row="0" column="0">
+    <item row="1" column="0">
      <layout class="QHBoxLayout" name="horizontalLayout"/>
+    </item>
+    <item row="0" column="0">
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>15</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>15</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>Segmentation preset:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="comboBox_preset"/>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>
@@ -64,7 +90,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>801</width>
      <height>26</height>
     </rect>
    </property>
@@ -85,7 +111,9 @@
     <property name="title">
      <string>Workflow</string>
     </property>
+    <addaction name="actionLoad_image"/>
     <addaction name="actionRectangle_selection"/>
+    <addaction name="actionBrush"/>
     <addaction name="actionRun"/>
    </widget>
    <addaction name="menuFile"/>
@@ -196,7 +224,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Brush</string>
+    <string>Brush selection</string>
    </property>
    <property name="toolTip">
     <string>Brush selection</string>
@@ -207,7 +235,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Run</string>
+    <string>Run segmentation</string>
    </property>
    <property name="toolTip">
     <string>Run segmentation</string>

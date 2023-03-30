@@ -31,12 +31,21 @@ class AboutDialog(QtWidgets.QDialog):
         super().__init__()
 
         self.setWindowTitle('What is this app about?')
+        self.setFixedSize(300,300)
         self.layout = QtWidgets.QVBoxLayout()
 
         about_text = QtWidgets.QLabel('This app was made by Buildwise, to simplify the use of one simple, '
                                       'yet efficient, machine learning algorithm. Start by loading an image, '
                                       'then adding a category.')
+        about_text.setWordWrap(True)
+        logos = QtWidgets.QLabel()
+        pixmap = QtGui.QPixmap(res.find('img/logo_buildwise2.png'))
+        w = self.width()
+        pixmap = pixmap.scaledToWidth(100, QtCore.Qt.SmoothTransformation)
+        logos.setPixmap(pixmap)
+
         self.layout.addWidget(about_text)
+        self.layout.addWidget(logos, alignment=QtCore.Qt.AlignCenter)
 
         self.setLayout(self.layout)
 
