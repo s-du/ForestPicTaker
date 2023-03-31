@@ -38,14 +38,21 @@ class AboutDialog(QtWidgets.QDialog):
                                       'yet efficient, machine learning algorithm. Start by loading an image, '
                                       'then adding a category.')
         about_text.setWordWrap(True)
-        logos = QtWidgets.QLabel()
+
+        logos1 = QtWidgets.QLabel()
         pixmap = QtGui.QPixmap(res.find('img/logo_buildwise2.png'))
         w = self.width()
         pixmap = pixmap.scaledToWidth(100, QtCore.Qt.SmoothTransformation)
-        logos.setPixmap(pixmap)
+        logos1.setPixmap(pixmap)
+
+        logos2 = QtWidgets.QLabel()
+        pixmap = QtGui.QPixmap(res.find('img/logo_pointify.png'))
+        pixmap = pixmap.scaledToWidth(100, QtCore.Qt.SmoothTransformation)
+        logos2.setPixmap(pixmap)
 
         self.layout.addWidget(about_text)
-        self.layout.addWidget(logos, alignment=QtCore.Qt.AlignCenter)
+        self.layout.addWidget(logos1, alignment=QtCore.Qt.AlignCenter)
+        self.layout.addWidget(logos2, alignment=QtCore.Qt.AlignCenter)
 
         self.setLayout(self.layout)
 
